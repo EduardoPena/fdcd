@@ -11,16 +11,11 @@ import org.slf4j.LoggerFactory;
 
 import br.edu.utfpr.pena.fdcd.algorithms.ecp.evidence.EvidenceSet;
 import br.edu.utfpr.pena.fdcd.algorithms.ecp.evidence.context.TupleContextBuilder;
-import br.edu.utfpr.pena.fdcd.algorithms.ecp.evidence.context.twocol.TwoColTupleContextBuilder;
 import br.edu.utfpr.pena.fdcd.algorithms.ecp.indexed_predicates.space.PredicateSpace;
-import br.edu.utfpr.pena.fdcd.algorithms.ecp.indexed_predicates.space.TwoColumnPredicateSpace;
 import br.edu.utfpr.pena.fdcd.algorithms.ecp.indexed_predicates.space.builder.PredicateSpaceBuilder;
-import br.edu.utfpr.pena.fdcd.algorithms.ecp.indexed_predicates.space.builder.TwoColumnPredicateSpaceBuilder;
 import br.edu.utfpr.pena.fdcd.algorithms.enumeration.DCEnumeration;
 import br.edu.utfpr.pena.fdcd.algorithms.enumeration.hydra.EvidenceInversion;
-import br.edu.utfpr.pena.fdcd.algorithms.enumeration.hydra.TwoColEvidenceInversion;
 import br.edu.utfpr.pena.fdcd.algorithms.enumeration.incs.INCS;
-import br.edu.utfpr.pena.fdcd.algorithms.enumeration.incs.twocol.TwoColINCS;
 import br.edu.utfpr.pena.fdcd.algorithms.enumeration.mmcs.ExternalMMCS;
 import br.edu.utfpr.pena.fdcd.input.Table;
 import br.edu.utfpr.pena.fdcd.input.reader.CSVInput;
@@ -44,9 +39,6 @@ public class FDCDMocker implements Callable<Integer> {
 	@Option(names = { "-e", "--enumeration" }, description = "DC enumeration algorithm: INCS, EI, HEI, MMCS, HMMCS ")
 	String dcEnumAlgorithm;
 
-	@Option(names = { "-t", "--twocol" }, description = "Enable cross column predicates or not.")
-	boolean twoCols;
-
 	enum DCEnumerationAlgorithm {
 		INCS, EI, HEI, MMCS, HMMCS, MCS
 	}
@@ -60,121 +52,82 @@ public class FDCDMocker implements Callable<Integer> {
 		else
 			input = new CSVInput(inputFilePath); // read all rows
 
-		DCEnumerationAlgorithm enumAlg = getEnumerationAlgorithm(dcEnumAlgorithm, twoCols);
+		DCEnumerationAlgorithm enumAlg = getEnumerationAlgorithm(dcEnumAlgorithm);
 
-		if (!twoCols) {
+		Table table = input.getTable();
+		PredicateSpace predicateSpace = null;
+		EvidenceSet evidenceSet = null;
+		Set<BitSet> dcs = null;
 
-			Table table = input.getTable();
-			PredicateSpace predicateSpace = null;
-			EvidenceSet evidenceSet = null;
-			Set<BitSet> dcs = null;
+		log.info("Building predicate space...");
+		predicateSpace = new PredicateSpaceBuilder().build(table);
+		log.info("Number of predicates: " + predicateSpace.size());
 
-			log.info("Building predicate space...");
-			predicateSpace = new PredicateSpaceBuilder().build(table);
-			log.info("Number of predicates: " + predicateSpace.size());
+		log.info("Building evidence set...");
+		TupleContextBuilder evidenceSetBuilder = new TupleContextBuilder(table, predicateSpace);
+		evidenceSet = evidenceSetBuilder.build();
 
-			log.info("Building evidence set...");
-			TupleContextBuilder evidenceSetBuilder = new TupleContextBuilder(table, predicateSpace);
-			evidenceSet = evidenceSetBuilder.build();
+		log.info("Enumerating DCs from the evidence set using " + enumAlg + " algorithm...");
+		DCEnumeration search = null;
 
-			log.info("Enumerating DCs from the evidence set using " + enumAlg + " algorithm...");
-			DCEnumeration search = null;
+		if (enumAlg == DCEnumerationAlgorithm.INCS) {
 
-			if (enumAlg == DCEnumerationAlgorithm.INCS) {
+			search = new INCS(predicateSpace, evidenceSet);
+			dcs = search.searchDCs();
 
-				search = new INCS(predicateSpace, evidenceSet);
-				dcs = search.searchDCs();
+		} else if (enumAlg == DCEnumerationAlgorithm.EI) {
 
-			} else if (enumAlg == DCEnumerationAlgorithm.EI) {
+			search = new EvidenceInversion(predicateSpace, evidenceSet);
+			dcs = search.searchDCs();
 
-				search = new EvidenceInversion(predicateSpace, evidenceSet);
-				dcs = search.searchDCs();
+		} else if (enumAlg == DCEnumerationAlgorithm.HEI) {
 
-			} else if (enumAlg == DCEnumerationAlgorithm.HEI) {
+			search = new EvidenceInversion(predicateSpace, evidenceSet);
+			dcs = search.searchDCs();
 
-				search = new EvidenceInversion(predicateSpace, evidenceSet);
-				dcs = search.searchDCs();
+		} else if (enumAlg == DCEnumerationAlgorithm.MMCS) {
 
-			} else if (enumAlg == DCEnumerationAlgorithm.MMCS) {
-
-				search = new ExternalMMCS(table, predicateSpace, evidenceSet);
-				dcs = search.searchDCs();
-				IOHelper.cleanDirectoryForMMCS();
-
-			} else if (enumAlg == DCEnumerationAlgorithm.HMMCS) {
-
-				search = new ExternalMMCS(table, predicateSpace, evidenceSet);
-				dcs = search.searchDCs();
-				IOHelper.cleanDirectoryForMMCS();
-
-			} else {
-				search = new INCS(predicateSpace, evidenceSet);
-				dcs = search.searchDCs();
+			search = new ExternalMMCS(table, predicateSpace, evidenceSet);
+			dcs = search.searchDCs();
+			
+			if(dcs.size()==0) {
+				log.info("Please, check if the MMCS executable is in the correct folder.");
 			}
+			
+			IOHelper.cleanDirectoryForMMCS();
 
-			log.info("Number of DCs discovered: " + dcs.size());
+		} else if (enumAlg == DCEnumerationAlgorithm.HMMCS) {
 
-			if (outputFilePath != null) {
-
-				log.info("Saving DCs into: " + outputFilePath);
-				BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath));
-				for (BitSet dc : dcs) {
-					writer.write(predicateSpace.toDCstring(dc) + System.lineSeparator());
-				}
-				writer.close();
+			search = new ExternalMMCS(table, predicateSpace, evidenceSet);
+			dcs = search.searchDCs();
+			
+			if(dcs.size()==0) {
+				log.info("Please, check if the MMCS executable is in the correct folder.");
 			}
+			
+			IOHelper.cleanDirectoryForMMCS();
 
 		} else {
+			search = new INCS(predicateSpace, evidenceSet);
+			dcs = search.searchDCs();
+		}
 
-			Table table = input.getTable();
-			TwoColumnPredicateSpace predicateSpace = null;
-			EvidenceSet evidenceSet = null;
-			Set<BitSet> dcs = null;
+		log.info("Number of DCs discovered: " + dcs.size());
 
-			log.info("Building two col predicate space...");
-			predicateSpace = new TwoColumnPredicateSpaceBuilder().build(table);
-			log.info("Number of predicates: " + predicateSpace.size());
+		if (outputFilePath != null) {
 
-			log.info("Building evidence set...");
-			TwoColTupleContextBuilder evidenceSetBuilder = new TwoColTupleContextBuilder(table, predicateSpace);
-			evidenceSet = evidenceSetBuilder.build();
-
-			if (enumAlg != DCEnumerationAlgorithm.EI && enumAlg != DCEnumerationAlgorithm.INCS)
-				enumAlg = DCEnumerationAlgorithm.EI;
-
-			log.info("Enumerating DCs from the evidence set using " + enumAlg + " algorithm...");
-			DCEnumeration search = null;
-
-			if (enumAlg == DCEnumerationAlgorithm.INCS) {
-
-				search = new TwoColINCS(predicateSpace, evidenceSet);
-				dcs = search.searchDCs();
-
-			} else if (enumAlg == DCEnumerationAlgorithm.EI) {
-
-				search = new TwoColEvidenceInversion(predicateSpace, evidenceSet);
-				dcs = search.searchDCs();
-
+			log.info("Saving DCs into: " + outputFilePath);
+			BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath));
+			for (BitSet dc : dcs) {
+				writer.write(predicateSpace.toDCstring(dc) + System.lineSeparator());
 			}
-
-			log.info("Number of DCs discovered: " + dcs.size());
-
-			if (outputFilePath != null) {
-
-				log.info("Saving DCs into: " + outputFilePath);
-				BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath));
-				for (BitSet dc : dcs) {
-					writer.write(predicateSpace.toDCstring(dc) + System.lineSeparator());
-				}
-				writer.close();
-			}
-
+			writer.close();
 		}
 
 		return 0;
 	}
 
-	private DCEnumerationAlgorithm getEnumerationAlgorithm(String dcEnumAlgorithm, boolean twoCols) {
+	private DCEnumerationAlgorithm getEnumerationAlgorithm(String dcEnumAlgorithm) {
 
 		if (dcEnumAlgorithm == null) {
 			return DCEnumerationAlgorithm.INCS;
