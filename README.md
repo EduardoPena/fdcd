@@ -37,7 +37,7 @@ Once you have compiled the code, you can run the discovery, for example:
 .../fdcd$ java -jar target/discoverDCs.jar data/tax.csv
 ```
 ### Parameters
-The only required parameter is the dataset, see the `data/` folder for how .csv are specified.
+The only required parameter is the dataset. See the `data/` folder for sample .csv files.
 You can also specify three additional parameters:
 - `-n` : the number of rows to be read as input for the algorithms. For example:
 ```bash
