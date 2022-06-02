@@ -15,20 +15,26 @@ Before building the algorithms, make sure to install the following prerequisites
 ## Setup 
 
 ### 1. Clone the code
+
 As the first step, clone this repository :
 ```bash
 $ git clone https://github.com/EduardoPena/fdcd.git
 $ cd fdcd
 ```
+
 ### 2. Compile the code and generate jar file 
+
 Then, build fdcd with the following maven command:
 ```bash
 .../fdcd$ mvn clean install
 ```
 The command above will create a "fat" jar called discoverDCs.jar and place it into the target folder.
+
 ### 3. Install MMCS Algorithm (optional)
+
 DC enumeration with the MMCS algorithm requires a C++ implementation, found in: [MHS generation algorithms](https://github.com/VeraLiconaResearchGroup/Minimal-Hitting-Set-Algorithms/blob/master/README.md).
 If you are willing to use it, please, follow the instructions to build the executable (we use the default name, agdmhs). Then, copy the executable agdmhs into the folder containg the fdcd jar (e.g., target).
+
 --------------------
 
 ## Execution
