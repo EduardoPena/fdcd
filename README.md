@@ -1,5 +1,5 @@
-# Fast Denial Constraint Discovery (FDCD)
-This repository contains the code for the paper "Fast Algorithms for Denial Constraint Discovery" submitted to VLDB22.
+
+This repository contains the code for the paper "Fast Algorithms for Denial Constraint Discovery".
 
 --------------------
 
